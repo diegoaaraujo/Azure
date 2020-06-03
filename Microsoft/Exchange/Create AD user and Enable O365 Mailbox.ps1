@@ -1,4 +1,4 @@
-  
+#  
 #add exchange snap-in
 Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn;
 
