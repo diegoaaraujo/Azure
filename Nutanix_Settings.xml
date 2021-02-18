@@ -1,0 +1,10 @@
+<Settings>
+    <Nutanix>
+        <CVM>>#IP_ADDRESS_NUTANIX_CLUSTER</CVM>
+        <USER>@USERNAME</USER>
+        <Pwd>@PASSWORD</Pwd>
+        <NetName>@Network</NetName>
+        <NetUUID>@UUIDCluster</NetUUID>
+        <Container>@ContainerName</Container>
+    </Nutanix>
+</Settings>
