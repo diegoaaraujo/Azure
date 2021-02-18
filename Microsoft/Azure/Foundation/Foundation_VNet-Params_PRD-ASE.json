@@ -1,0 +1,52 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "2020.06.23.01",
+    "metadata": {
+        "comments": "This parameters file deploys the base foundation VNet.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "entity": {
+            "value": "MAF"
+        },
+        "service": {
+            "value": "NET"
+        },
+        "locationFull": {
+            "value": "australiasoutheast"
+        },
+        "environment": {
+            "value": "PRD"
+        },
+        "vnetAddress": {
+            "value": "10.50.0.0/16"
+        },
+        "subnet1Type": {
+            "value": "DMZ"
+        },
+        "subnet1Address": {
+            "value": "10.50.0.0/24"
+        },
+         "subnet2Type": {
+            "value": "APP"
+        },
+       "subnet2Address": {
+            "value": "10.50.1.0/24"
+        },
+       "gatewaySubnetAddress": {
+            "value": "10.50.254.0/24"
+        },
+        "tagCreatedBy": {
+            "value": "MOQdigital"
+        },
+        "tagEnvironment": {
+            "value": "PRD"
+        },
+        "tagOwner": {
+            "value": "MOQdigital"
+        },
+        "tagProject": {
+            "value": "Foundation"
+        }
+    }
+}

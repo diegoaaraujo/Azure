@@ -1,0 +1,570 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "2020.09.29.01",
+  "metadata": {
+    "comments": "This template deploys a KeyVault, Storage Account, OMS Workspace and Automation Account. It should be deployed to the INF Resource Group and requires an AAD group to be available for the KeyVault.",
+    "author": "Colin Roche, MOQdigital"
+  },
+  "parameters": {
+    "entity": {
+      "type": "string",
+      "metadata": {
+        "description": "The Entity name."
+      }
+    },
+    "service": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 3,
+      "metadata": {
+        "description": "Service abbreviation, e.g. INF."
+      }
+    },
+    "locationFull": {
+      "type": "string",
+      "allowedValues": [
+        "australiaeast",
+        "australiasoutheast",
+        "eastasia",
+        "southeastasia"
+      ],
+      "metadata": {
+        "description": "Region to which the VM is being deployed."
+      }
+    },
+    "environment": {
+      "type": "string",
+      "allowedValues": [
+        "PRD",
+        "NPRD"
+      ],
+      "metadata": {
+        "description": "Environment contains the abbreviation of the environment that you are deploying to."
+      }
+    },
+    "role": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 4,
+      "metadata": {
+        "description": "VM Role abbreviation, e.g. WFE for Web Front End."
+      }
+    },
+    "ownersGroupObjectId01": {
+      "type": "string",
+      "metadata": {
+        "description": "Contains the Object Id of the first group used to access the Key Vault."
+      }
+    },
+    "omsWorkspacesku": {
+      "type": "string",
+      "allowedValues": [
+        "PerGB2018",
+        "Free",
+        "Standalone",
+        "PerNode",
+        "Standard",
+        "Premium"
+      ],
+      "defaultValue": "pergb2018",
+      "metadata": {
+        "description": "Pricing tier: pergb2018 or legacy tiers (Free, Standalone, PerNode, Standard or Premium) which are not available to all customers."
+      }
+    },
+    "omsdataRetention": {
+      "type": "int",
+      "defaultValue": 30,
+      "minValue": 7,
+      "maxValue": 730,
+      "metadata": {
+        "description": "Number of days of retention. Workspaces in the legacy Free pricing tier can only have 7 days."
+      }
+    },
+    "omsPurgeDataOn30Days": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "If set to true, changing retention to 30 days will immediately delete older data. Use this with extreme caution. This only applies when retention is being set to 30 days."
+      }
+    },
+    "omsdailyQuotaGb": {
+      "type": "int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "Limit of the daily log ingestion to the workspace. '-1' is unlimited. Default is a 1GB limit."
+      }
+    },
+    "tagCreatedBy": {
+      "type": "string",
+      "metadata": {
+        "description": "Value for the 'Created By' tag."
+      }
+    },
+    "tagEnvironment": {
+      "type": "string",
+      "metadata": {
+        "description": "Value for the 'Environment' tag."
+      }
+    },
+    "tagOwner": {
+      "type": "string",
+      "metadata": {
+        "description": "Value for the 'Pwner' tag."
+      }
+    },
+    "tagProject": {
+      "type": "string",
+      "metadata": {
+        "description": "Value for the 'Project' tag."
+      }
+    }
+  },
+  "variables": {
+    "region": {
+      "australiaeast": "AE",
+      "australiasoutheast": "ASE",
+      "eastasia": "EA",
+      "southeastasia": "SEA"
+    },
+    "keyvaultName": "[toUpper(concat(parameters('entity'),'-KV-',parameters('service'),'-',parameters('role'),'-',parameters('environment'),'-',variables('region')[parameters('locationFull')]))]",
+    "omsWorkspaceName": "[toUpper(concat(parameters('entity'),'-OMS-',parameters('service'),'-',parameters('environment'),'-',variables('region')[parameters('locationFull')]))]",
+    "storageaccountName": "[toLower(concat(parameters('entity'),'sa',parameters('service'),parameters('environment'),variables('region')[parameters('locationFull')]))]",
+    "automationAccountName": "[toUpper(concat(parameters('entity'),'-AA-',parameters('service'),'-',parameters('environment'),'-',variables('region')[parameters('locationFull')]))]",
+    "Updates": {
+      "name": "[concat('Updates','(',variables('omsWorkspaceName'),')')]",
+      "galleryName": "Updates"
+    },
+    "AntiMalware": {
+      "Name": "[concat('AntiMalware','(',variables('omsWorkspaceName'),')')]",
+      "GalleryName": "AntiMalware"
+    },
+    "SQLAssessment": {
+      "Name": "[Concat('SQLAssessment','(',variables('omsWorkspaceName'),')')]",
+      "GalleryName": "SQLAssessment"
+    },
+    "NetworkMonitoring": {
+      "Name": "[Concat('NetworkMonitoring','(',variables('omsWorkspaceName'),')')]",
+      "GalleryName": "NetworkMonitoring"
+    },
+    "WaaSUpdateInsights": {
+      "Name": "[Concat('WaaSUpdateInsights','(',variables('omsWorkspaceName'),')')]",
+      "GalleryName": "WaaSUpdateInsights"
+    },
+    "AgentHealthAssessment": {
+      "Name": "[Concat('AgentHealthAssessment','(',variables('omsWorkspaceName'),')')]",
+      "GalleryName": "AgentHealthAssessment"
+    },
+    "VMInsights": {
+      "Name": "[Concat('VMInsights','(',variables('omsWorkspaceName'),')')]",
+      "GalleryName": "VMInsights"
+    },
+    "omsWorkspaceId": "[concat(resourceId(concat(parameters('entity'),'-RG-',variables('region')[parameters('locationFull')],'-INF-',parameters('environment')),'microsoft.operationalinsights/workspaces/',variables('omsWorkspaceName')))]",
+    "storageaccountId": "[toLower(concat(resourceId(concat(parameters('entity'),'-RG-',variables('region')[parameters('locationFull')],'-INF-',parameters('environment')),'Microsoft.Storage/storageAccounts/', variables('storageAccountName'))))]"
+  },
+  "resources": [
+    {
+      "comments": "General Keyvault for the environment. Used primarily for automated deployements.",
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2019-09-01",
+      "name": "[variables('keyvaultName')]",
+      "dependsOn": [
+        "[variables('storageAccountName')]"
+      ],
+      "location": "[parameters('locationFull')]",
+      "tags": {
+        "Created By": "[parameters('tagCreatedBy')]",
+        "Environment": "[parameters('tagEnvironment')]",
+        "Owner": "[parameters('tagOwner')]",
+        "Project": "[parameters('tagProject')]"
+      },
+      "properties": {
+        "enabledForDeployment": true,
+        "enabledForTemplateDeployment": true,
+        "enabledForDiskEncryption": false,
+        "enableSoftDelete": true,
+        "tenantId": "[subscription().tenantId]",
+        "accessPolicies": [
+          {
+            "tenantId": "[subscription().tenantId]",
+            "objectId": "[parameters('ownersGroupObjectId01')]",
+            "permissions": {
+              "keys": [
+                "get",
+                "list",
+                "update",
+                "create",
+                "import",
+                "delete",
+                "recover",
+                "backup",
+                "restore",
+                "decrypt",
+                "encrypt",
+                "wrapKey",
+                "unwrapKey",
+                "verify",
+                "sign"
+              ],
+              "secrets": [
+                "get",
+                "list",
+                "set",
+                "delete",
+                "recover",
+                "backup",
+                "restore"
+              ],
+              "certificates": [
+                "get",
+                "list",
+                "delete",
+                "create",
+                "import",
+                "update",
+                "managecontacts",
+                "recover",
+                "backup",
+                "restore",
+                "manageissuers",
+                "getissuers",
+                "listissuers",
+                "setissuers",
+                "deleteissuers"
+              ]
+            }
+          }
+        ],
+        "sku": {
+          "name": "standard",
+          "family": "A"
+        }
+      }
+    },
+    {
+      "comments": "Creates an OMS workspace.",
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2015-11-01-preview",
+      "name": "[variables('omsWorkspaceName')]",
+      "dependsOn": [
+        "[variables('storageAccountName')]"
+      ],
+      "tags": {
+        "Created By": "[parameters('tagCreatedBy')]",
+        "Environment": "[parameters('tagEnvironment')]",
+        "Owner": "[parameters('tagOwner')]",
+        "Project": "[parameters('tagProject')]"
+      },
+      "location": "[parameters('locationFull')]",
+      "properties": {
+        "retentionInDays": "[parameters('omsdataRetention')]",
+        "features": {
+          "immediatePurgeDataOn30Days": "[parameters('omsPurgeDataOn30Days')]"
+        },
+        "sku": {
+          "name": "[parameters('omsWorkspacesku')]"
+        },
+        "workspaceCapping": {
+          "dailyQuotaGb": "[parameters('omsdailyQuotaGb')]"
+        }
+      },
+      "resources": [
+        {
+          "comments": "Enables VM update management solution that can be used from the linked Automation account.",
+          "apiVersion": "2015-11-01-preview",
+          "location": "[parameters('locationFull')]",
+          "name": "[variables('Updates').name]",
+          "type": "Microsoft.OperationsManagement/solutions",
+          "id": "[concat('/subscriptions/',subscription().subscriptionId,'/resourceGroups/',resourceGroup().name,'/providers/Microsoft.OperationsManagement/solutions/',variables('Updates').name)]",
+          "dependsOn": [
+            "[concat('Microsoft.OperationalInsights/workspaces/', variables('omsWorkspaceName'))]"
+          ],
+          "properties": {
+            "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/', variables('omsWorkspaceName'))]"
+          },
+          "plan": {
+            "name": "[variables('Updates').name]",
+            "publisher": "Microsoft",
+            "promotionCode": "",
+            "product": "[concat('OMSGallery/',variables('Updates').galleryName)]"
+          }
+        },
+        {
+          "comments": "Enables Antimalware solution that shows VMs with malware issues.",
+          "apiVersion": "2015-11-01-preview",
+          "location": "[parameters('locationFull')]",
+          "name": "[variables('AntiMalware').Name]",
+          "type": "Microsoft.OperationsManagement/solutions",
+          "id": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.OperationsManagement/solutions/', variables('AntiMalware').Name)]",
+          "dependsOn": [
+            "[concat('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          ],
+          "properties": {
+            "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          },
+          "plan": {
+            "name": "[variables('AntiMalware').Name]",
+            "publisher": "Microsoft",
+            "product": "[Concat('OMSGallery/', variables('AntiMalware').GalleryName)]",
+            "promotionCode": ""
+          }
+        },
+        {
+          "comments": "Enables SQL Assessment solution that shows SQL instances with issues.",
+          "apiVersion": "2015-11-01-preview",
+          "location": "[parameters('locationFull')]",
+          "name": "[variables('SQLAssessment').Name]",
+          "type": "Microsoft.OperationsManagement/solutions",
+          "id": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.OperationsManagement/solutions/', variables('SQLAssessment').Name)]",
+          "dependsOn": [
+            "[concat('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          ],
+          "properties": {
+            "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          },
+          "plan": {
+            "name": "[variables('SQLAssessment').Name]",
+            "publisher": "Microsoft",
+            "product": "[Concat('OMSGallery/', variables('SQLAssessment').GalleryName)]",
+            "promotionCode": ""
+          }
+        },
+        {
+          "comments": "Enables NetworkMonitoring solution that enables traffic monitoring to be discovered. Requires additional configuration.",
+          "apiVersion": "2015-11-01-preview",
+          "location": "[parameters('locationFull')]",
+          "name": "[variables('NetworkMonitoring').Name]",
+          "type": "Microsoft.OperationsManagement/solutions",
+          "id": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.OperationsManagement/solutions/', variables('NetworkMonitoring').Name)]",
+          "dependsOn": [
+            "[concat('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          ],
+          "properties": {
+            "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          },
+          "plan": {
+            "name": "[variables('NetworkMonitoring').Name]",
+            "publisher": "Microsoft",
+            "product": "[Concat('OMSGallery/', variables('NetworkMonitoring').GalleryName)]",
+            "promotionCode": ""
+          }
+        },
+        {
+          "comments": "Enables Windows Update Compliance solution that shows VMs with update issues.",
+          "apiVersion": "2015-11-01-preview",
+          "location": "[parameters('locationFull')]",
+          "name": "[variables('WaaSUpdateInsights').Name]",
+          "type": "Microsoft.OperationsManagement/solutions",
+          "id": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.OperationsManagement/solutions/', variables('WaaSUpdateInsights').Name)]",
+          "dependsOn": [
+            "[concat('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          ],
+          "properties": {
+            "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          },
+          "plan": {
+            "name": "[variables('WaaSUpdateInsights').Name]",
+            "publisher": "Microsoft",
+            "product": "[Concat('OMSGallery/', variables('WaaSUpdateInsights').GalleryName)]",
+            "promotionCode": ""
+          }
+        },
+        {
+          "comments": "Discovers VMs with unhealthy agents.",
+          "apiVersion": "2015-11-01-preview",
+          "location": "[parameters('locationFull')]",
+          "name": "[variables('AgentHealthAssessment').Name]",
+          "type": "Microsoft.OperationsManagement/solutions",
+          "id": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.OperationsManagement/solutions/', variables('AgentHealthAssessment').Name)]",
+          "dependsOn": [
+            "[concat('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          ],
+          "properties": {
+            "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          },
+          "plan": {
+            "name": "[variables('AgentHealthAssessment').Name]",
+            "publisher": "Microsoft",
+            "product": "[Concat('OMSGallery/', variables('AgentHealthAssessment').GalleryName)]",
+            "promotionCode": ""
+          }
+        },
+        {
+          "comments": "Discovers VMs with unhealthy agents.",
+          "apiVersion": "2015-11-01-preview",
+          "location": "[parameters('locationFull')]",
+          "name": "[variables('VMInsights').Name]",
+          "type": "Microsoft.OperationsManagement/solutions",
+          "id": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', resourceGroup().name, '/providers/Microsoft.OperationsManagement/solutions/', variables('VMInsights').Name)]",
+          "dependsOn": [
+            "[concat('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          ],
+          "properties": {
+            "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]"
+          },
+          "plan": {
+            "name": "[variables('VMInsights').Name]",
+            "publisher": "Microsoft",
+            "product": "[Concat('OMSGallery/', variables('VMInsights').GalleryName)]",
+            "promotionCode": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "[variables('storageAccountName')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2019-06-01",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "Storage",
+      "location": "[parameters('locationFull')]",
+      "tags": {
+        "Created By": "[parameters('tagCreatedBy')]",
+        "Environment": "[parameters('tagEnvironment')]",
+        "Owner": "[parameters('tagOwner')]",
+        "Project": "[parameters('tagProject')]"
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "encryption": {
+          "services": {
+            "blob": {
+              "enabled": true
+            },
+            "file": {
+              "enabled": true
+            }
+          },
+          "keySource": "Microsoft.Storage"
+        },
+        "supportsHttpsTrafficOnly": true
+      }
+    },
+    {
+      "name": "[variables('automationAccountName')]",
+      "type": "Microsoft.Automation/automationAccounts",
+      "apiVersion": "2015-10-31",
+      "location": "[parameters('locationFull')]",
+      "tags": {
+        "Created By": "[parameters('tagCreatedBy')]",
+        "Environment": "[parameters('tagEnvironment')]",
+        "Owner": "[parameters('tagOwner')]",
+        "Project": "[parameters('tagProject')]"
+      },
+      "properties": {
+        "sku": {
+          "name": "Basic"
+        }
+      }
+    },
+    {
+      "comments": "Creates link betweern the OMS workspace and the Automation account.",
+      "name": "[concat(variables('omsWorkspaceName'),'/','Automation')]",
+      "apiVersion": "2020-03-01-preview",
+      "type": "Microsoft.OperationalInsights/workspaces/linkedServices",
+      "location": "[parameters('locationFull')]",
+      "dependsOn": [
+        "[concat('Microsoft.OperationalInsights/workspaces/',variables('omsWorkspaceName'))]",
+        "[concat('Microsoft.Automation/automationAccounts/',variables('automationAccountName'))]"
+      ],
+      "properties": {
+        "resourceId": "[resourceId('Microsoft.Automation/automationAccounts/',variables('automationAccountName'))]"
+      }
+    },
+    {
+      "comments": "Creates an OMS solution for Azure Activity Logst.",
+      "type": "Microsoft.OperationsManagement/solutions",
+      "apiVersion": "2015-11-01-preview",
+      "name": "[concat('AzureActivity(',variables('omsWorkspaceName'),')')]",
+      "location": "[parameters('locationFull')]",
+      "dependsOn": [
+        "[resourceId('microsoft.operationalinsights/workspaces',variables('omsWorkspaceName'))]"
+      ],
+      "plan": {
+        "name": "[concat('AzureActivity(',variables('omsWorkspaceName'),')')]",
+        "promotionCode": "",
+        "product": "OMSGallery/AzureActivity",
+        "publisher": "Microsoft"
+      },
+      "properties": {
+        "workspaceResourceId": "[resourceId('microsoft.operationalinsights/workspaces',variables('omsWorkspaceName'))]",
+        "containedResources": [
+          "[concat(resourceId('microsoft.operationalinsights/workspaces',variables('omsWorkspaceName')),'/views/AzureActivity(',variables('omsWorkspaceName'))]"
+        ]
+      }
+    },
+    {
+      "comments": "Adds a data source to the OMS workspace for Azure Activity Logs.",
+      "type": "Microsoft.OperationalInsights/workspaces/datasources",
+      "kind": "AzureActivityLog",
+      "name": "[concat(variables('omsWorkspaceName'),'/',subscription().subscriptionId)]",
+      "apiVersion": "2015-11-01-preview",
+      "location": "[parameters('locationFull')]",
+      "dependsOn": [
+        "[variables('omsWorkspaceName')]"
+      ],
+      "properties": {
+        "linkedResourceId": "[concat(subscription().Id,'/providers/microsoft.insights/eventTypes/management')]"
+      }
+    },
+    {
+      "comments": "Enables diagnostics logs for the Key Vault and sends them to OMS and the Storage Account with 3 days retention.",
+      "type": "Microsoft.KeyVault/vaults/providers/diagnosticSettings",
+      "name": "[concat(variables('keyvaultName'),'/microsoft.insights/',variables('omsWorkspaceName'))]",
+      "apiVersion": "2017-05-01-preview",
+      "properties": {
+        "name": "[variables('omsWorkspaceName')]",
+        "storageAccountId": "[variables('storageAccountId')]",
+        "workspaceId": "[variables('omsWorkspaceId')]",
+        "logs": [
+          {
+            "category": "AuditEvent",
+            "enabled": true,
+            "retentionPolicy": {
+              "days": 3,
+              "enabled": false
+            }
+          }
+        ],
+        "metrics": [
+        ]
+      },
+      "dependsOn": [
+        "[variables('keyvaultName')]",
+        "[variables('storageAccountName')]"
+      ]
+    },
+    {
+      "comments": "Enables diagnostics logs for the Automation Account for job logs and sends them to OMS and the Storage Account with 3 days retention.",
+      "type": "Microsoft.Automation/automationAccounts/providers/diagnosticSettings",
+      "name": "[concat(variables('automationaccountName'),'/microsoft.insights/',variables('omsWorkspaceName'))]",
+      "apiVersion": "2017-05-01-preview",
+      "properties": {
+        "name": "[variables('omsWorkspaceName')]",
+        "storageAccountId": "[variables('storageAccountId')]",
+        "workspaceId": "[variables('omsWorkspaceId')]",
+        "logs": [
+          {
+            "category": "JobLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "days": 3,
+              "enabled": false
+            }
+          }
+        ],
+        "metrics": [
+        ]
+      },
+      "dependsOn": [
+        "[variables('keyvaultName')]",
+        "[variables('storageAccountName')]"
+      ]
+    }
+  ],
+  "outputs": {
+  }
+}

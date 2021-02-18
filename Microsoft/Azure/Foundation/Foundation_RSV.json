@@ -1,0 +1,388 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "2020.09.29.01",
+    "metadata": {
+        "comments": "This template deploys a base foundation Recovery Services Vault. It should be deployed before any VMs.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "entity": {
+            "type": "string",
+            "metadata": {
+                "description": "The Entity name."
+            }
+        },
+        "service": {
+            "type": "string",
+            "metadata": {
+                "description": "The service."
+            }
+        },
+        "locationFull": {
+            "type": "string",
+            "allowedValues": [
+                "australiaeast",
+                "australiasoutheast",
+                "eastasia",
+                "southeastasia"
+            ],
+            "metadata": {
+                "description": "The primary location 'Full' being deployed to."
+            }
+        },
+        "omslocationFull": {
+            "type": "string",
+            "allowedValues": [
+                "australiaeast",
+                "australiasoutheast",
+                "eastasia",
+                "southeastasia"
+            ],
+            "metadata": {
+                "description": "The location of the OMS workspace being deployed to."
+            }
+        },
+        "environment": {
+            "type": "string",
+            "allowedValues": [
+                "PRD",
+                "NPRD"
+            ],
+            "metadata": {
+                "description": "The type of environment being deployed"
+            }
+        },
+        "timeZone": {
+            "type": "string",
+            "metadata": {
+                "description": "TimeZone for the Policies."
+            }
+        },
+        "weeklyScheduleRunDays": {
+            "type": "array",
+            "metadata": {
+                "description": "Backup Schedule will run on array of Days like, Monday, Tuesday etc. Applies in Weekly Backup Type only."
+            }
+        },
+        "scheduleRunTimes": {
+            "type": "array",
+            "metadata": {
+                "description": "Times in day when backup should be triggered. e.g. 01:00 or 13:00. Must be an array, however for IaaS VMs only one value is valid. This will be used in LTR too for daily, weekly, monthly and yearly backup."
+            }
+        },
+        "backupStorageType": {
+            "type": "string",
+            "allowedValues": [
+                "LocallyRedundant",
+                "GeoRedundant"
+            ],
+            "defaultValue": "LocallyRedundant",
+            "metadata": {
+                "description": "LRS or GRS for the backup."
+            }
+        },
+        "tagCreatedBy": {
+            "type": "string",
+            "metadata": {
+                "description": "The createdBy Tag"
+            }
+        },
+        "tagEnvironment": {
+            "type": "string",
+            "metadata": {
+                "description": "The environment Tag"
+            }
+        },
+        "tagOwner": {
+            "type": "string",
+            "metadata": {
+                "description": "The owner Tag"
+            }
+        },
+        "tagProject": {
+            "type": "string",
+            "metadata": {
+                "description": "The project Tag"
+            }
+        }
+    },
+    "variables": {
+        "region": {
+            "australiaeast": "AE",
+            "australiasoutheast": "ASE",
+            "eastasia": "EA",
+            "southeastasia": "SEA"
+        },
+        "rsvName": "[concat(parameters('Entity'),'-RSV-',parameters('Service'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')])]",
+        "omsWorkspaceName": "[toUpper(concat(parameters('entity'),'-OMS-INF-',parameters('environment'),'-',variables('region')[parameters('omslocationFull')]))]",
+        "storageaccountName": "[toLower(concat(parameters('entity'),'sa','inf',parameters('environment'),variables('region')[parameters('omslocationFull')]))]",
+        "omsWorkspaceId": "[concat(resourceId(concat(parameters('entity'),'-RG-',variables('region')[parameters('omslocationFull')],'-INF-',parameters('environment')),'microsoft.operationalinsights/workspaces/',variables('omsWorkspaceName')))]",
+        "storageaccountId": "[toLower(concat(resourceId(concat(parameters('entity'),'-RG-',variables('region')[parameters('omslocationFull')],'-INF-',parameters('environment')),'Microsoft.Storage/storageAccounts/', variables('storageAccountName'))))]"
+
+    },
+    "resources": [
+        {
+            "comments": "RSV for general VM backups.",
+            "name": "[variables('rsvName')]",
+            "type": "Microsoft.RecoveryServices/vaults",
+            "apiVersion": "2016-06-01",
+            "location": "[parameters('LocationFull')]",
+            "tags": {
+                "Created By": "[parameters('tagCreatedBy')]",
+                "Environment": "[parameters('tagEnvironment')]",
+                "Owner": "[parameters('tagOwner')]",
+                "Project": "[parameters('tagProject')]"
+            },
+            "identity": {
+                "type": "none"
+            },
+            "properties": {
+            },
+            "sku": {
+                "name": "RS0",
+                "tier": "Standard"
+            }
+        },
+        {
+            "type": "Microsoft.RecoveryServices/vaults/backupstorageconfig",
+            "name": "[concat(variables('rsvName'),'/vaultstorageconfig')]",
+            "apiVersion": "2018-01-10",
+            "dependsOn": [
+                "[resourceId('Microsoft.RecoveryServices/vaults/',variables('rsvName'))]"
+            ],
+            "properties": {
+                "StorageModelType": "[parameters('backupStorageType')]"
+            }
+        },
+        {
+            "comments": "Bronze backup policy for VMs. Weekly only.",
+            "apiVersion": "2016-06-01",
+            "name": "[concat(variables('rsvName'), '/Bronze')]",
+            "type": "Microsoft.RecoveryServices/vaults/backupPolicies",
+            "dependsOn": [
+                "[variables('rsvName')]"
+            ],
+            "location": "[parameters('locationFull')]",
+            "properties": {
+                "backupManagementType": "AzureIaasVM",
+                "instantRpRetentionRangeInDays": 5,
+                "schedulePolicy": {
+                    "scheduleRunFrequency": "Weekly",
+                    "scheduleRunDays": "[parameters('weeklyScheduleRunDays')]",
+                    "scheduleRunTimes": "[parameters('scheduleRunTimes')]",
+                    "schedulePolicyType": "SimpleSchedulePolicy"
+                },
+                "retentionPolicy": {
+                    "dailySchedule": null,
+                    "weeklySchedule": {
+                        "daysOfTheWeek": "[parameters('weeklyScheduleRunDays')]",
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 4,
+                            "durationType": "Weeks"
+                        }
+                    },
+                    "monthlySchedule": null,
+                    "yearlySchedule": null,
+                    "retentionPolicyType": "LongTermRetentionPolicy"
+                },
+                "timeZone": "[parameters('timeZone')]"
+            }
+        },
+        {
+            "comments": "Silver backup policy for VMs. Daily and weekly only.",
+            "apiVersion": "2016-06-01",
+            "name": "[concat(variables('rsvName'), '/Silver')]",
+            "type": "Microsoft.RecoveryServices/vaults/backupPolicies",
+            "dependsOn": [
+                "[variables('rsvName')]"
+            ],
+            "location": "[parameters('locationFull')]",
+            "properties": {
+                "backupManagementType": "AzureIaasVM",
+                "instantRpRetentionRangeInDays": 5,
+                "schedulePolicy": {
+                    "scheduleRunFrequency": "Daily",
+                    "scheduleRunDays": null,
+                    "scheduleRunTimes": "[parameters('scheduleRunTimes')]",
+                    "schedulePolicyType": "SimpleSchedulePolicy"
+                },
+                "retentionPolicy": {
+                    "dailySchedule": {
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 7,
+                            "durationType": "Days"
+                        }
+                    },
+                    "weeklySchedule": {
+                        "daysOfTheWeek": "[parameters('weeklyScheduleRunDays')]",
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 4,
+                            "durationType": "Weeks"
+                        }
+                    },
+                    "monthlySchedule": null,
+                    "yearlySchedule": null,
+                    "retentionPolicyType": "LongTermRetentionPolicy"
+                },
+                "timeZone": "[parameters('timeZone')]"
+            }
+        },
+        {
+            "comments": "Gold backup policy for VMs. Daily, weekly and montly only.",
+            "apiVersion": "2016-06-01",
+            "name": "[concat(variables('rsvName'), '/Gold')]",
+            "type": "Microsoft.RecoveryServices/vaults/backupPolicies",
+            "dependsOn": [
+                "[variables('rsvName')]"
+            ],
+            "location": "[parameters('locationFull')]",
+            "properties": {
+                "backupManagementType": "AzureIaasVM",
+                "instantRpRetentionRangeInDays": 5,
+                "schedulePolicy": {
+                    "scheduleRunFrequency": "Daily",
+                    "scheduleRunDays": null,
+                    "scheduleRunTimes": "[parameters('scheduleRunTimes')]",
+                    "schedulePolicyType": "SimpleSchedulePolicy"
+                },
+                "retentionPolicy": {
+                    "dailySchedule": {
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 7,
+                            "durationType": "Days"
+                        }
+                    },
+                    "weeklySchedule": {
+                        "daysOfTheWeek": "[parameters('weeklyScheduleRunDays')]",
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 4,
+                            "durationType": "Weeks"
+                        }
+                    },
+                    "monthlySchedule": {
+                        "retentionScheduleFormatType": "Weekly",
+                        "retentionScheduleDaily": null,
+                        "retentionScheduleWeekly": {
+                            "daysOfTheWeek": "[parameters('weeklyScheduleRunDays')]",
+                            "weeksOfTheMonth": [
+                                "First"
+                            ]
+                        },
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 12,
+                            "durationType": "Months"
+                        }
+                    },
+                    "yearlySchedule": null,
+                    "retentionPolicyType": "LongTermRetentionPolicy"
+                },
+                "timeZone": "[parameters('timeZone')]"
+            }
+        },
+        {
+            "comments": "Platinum backup policy for VMs. Daily, weekly, monthly and yearly.",
+            "apiVersion": "2016-06-01",
+            "name": "[concat(variables('rsvName'), '/Platinum')]",
+            "type": "Microsoft.RecoveryServices/vaults/backupPolicies",
+            "dependsOn": [
+                "[variables('rsvName')]"
+            ],
+            "location": "[parameters('locationFull')]",
+            "properties": {
+                "backupManagementType": "AzureIaasVM",
+                "instantRpRetentionRangeInDays": 5,
+                "schedulePolicy": {
+                    "scheduleRunFrequency": "Daily",
+                    "scheduleRunDays": null,
+                    "scheduleRunTimes": "[parameters('scheduleRunTimes')]",
+                    "schedulePolicyType": "SimpleSchedulePolicy"
+                },
+                "retentionPolicy": {
+                    "dailySchedule": {
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 7,
+                            "durationType": "Days"
+                        }
+                    },
+                    "weeklySchedule": {
+                        "daysOfTheWeek": "[parameters('weeklyScheduleRunDays')]",
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 4,
+                            "durationType": "Weeks"
+                        }
+                    },
+                    "monthlySchedule": {
+                        "retentionScheduleFormatType": "Weekly",
+                        "retentionScheduleDaily": null,
+                        "retentionScheduleWeekly": {
+                            "daysOfTheWeek": "[parameters('weeklyScheduleRunDays')]",
+                            "weeksOfTheMonth": [
+                                "First"
+                            ]
+                        },
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 12,
+                            "durationType": "Months"
+                        }
+                    },
+                    "yearlySchedule": {
+                        "retentionScheduleFormatType": "Weekly",
+                        "monthsOfYear": [
+                            "January"
+                        ],
+                        "retentionScheduleDaily": null,
+                        "retentionScheduleWeekly": {
+                            "daysOfTheWeek": "[parameters('weeklyScheduleRunDays')]",
+                            "weeksOfTheMonth": [
+                                "First"
+                            ]
+                        },
+                        "retentionTimes": "[parameters('scheduleRunTimes')]",
+                        "retentionDuration": {
+                            "count": 7,
+                            "durationType": "Years"
+                        }
+                    },
+                    "retentionPolicyType": "LongTermRetentionPolicy"
+                },
+                "timeZone": "[parameters('timeZone')]"
+            }
+        },
+        {
+            "type": "Microsoft.RecoveryServices/vaults/providers/diagnosticSettings",
+            "name": "[concat(variables('rsvName'), '/microsoft.insights/', variables('omsWorkspaceName'))]",
+            "apiVersion": "2017-05-01-preview",
+            "properties": {
+                "name": "[variables('omsWorkspaceName')]",
+                "storageAccountId": "[variables('storageaccountId')]",
+                "workspaceId": "[variables('omsworkspaceId')]",
+                "logs": [
+                    {
+                        "category": "AzureBackupReport",
+                        "enabled": true,
+                        "retentionPolicy": {
+                            "days": 7,
+                            "enabled": false
+                        }
+                    }
+                ],
+                "metrics": [
+                ]
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.RecoveryServices/vaults/', variables('rsvName'))]"
+            ]
+        }
+    ],
+    "outputs": {
+    }
+}

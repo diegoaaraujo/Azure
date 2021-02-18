@@ -1,0 +1,55 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "2020.06.23.01",
+    "metadata": {
+        "comments": "This parameters file deploys the base foundation NSG.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "budgetName": {
+            "value": "Production Subscription Budget"
+        },
+        "amount": {
+            "value": "150"
+        },
+        "budgetCategory": {
+            "value": "Cost"
+        },
+        "timeGrain": {
+            "value": "Monthly"
+        },
+        "startDate": {
+            "value": "2020-06-01"
+        },
+        "endDate": {
+            "value": "2028-12-31"
+        },
+        "operator": {
+            "value": "GreaterThan"
+        },
+        "threshold": {
+            "value": "90"
+        },
+        "contactEmails": {
+            "value": [
+                "croche@moqdigital.com.au",
+                "admin@killerclowns.xyz"
+            ]
+        },
+        "contactRoles": {
+            "value": [
+                "Contributor",
+                "Reader"
+            ]
+        },
+        "contactGroups": {
+            "value": []
+        },
+        "resourcesFilter": {
+            "value": []
+        },
+        "metersFilter": {
+            "value": []
+        }
+    }
+}

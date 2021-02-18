@@ -1,0 +1,49 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "2020.09.29.01",
+    "metadata": {
+        "comments": "This parameters file deploys the base foundation Recovery Services Vault.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "entity": {
+            "value": "MAF"
+        },
+        "service": {
+            "value": "INF"
+        },
+        "locationFull": {
+            "value": "australiasoutheast"
+        },
+        "omslocationFull": {
+            "value": "australiasoutheast"
+        },
+        "environment": {
+            "value": "PRD"
+        },
+        "timeZone": {
+            "value": "E. Australia Standard Time"
+        },
+        "weeklyScheduleRunDays": {
+            "value": ["Sunday"]
+        },
+        "scheduleRunTimes": {
+            "value": ["2020-06-22T20:00:00.000Z"]
+        },
+        "backupStorageType": {
+            "value": "LocallyRedundant"
+        },
+        "tagCreatedBy": {
+            "value": "MOQdigital"
+        },
+        "tagEnvironment": {
+            "value": "PRD"
+        },
+        "tagOwner": {
+            "value": "MOQdigital"
+        },
+        "tagProject": {
+            "value": "Foundation"
+        }
+    }
+}

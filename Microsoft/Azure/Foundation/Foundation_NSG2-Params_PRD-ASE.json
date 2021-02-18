@@ -1,0 +1,43 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "2020.07.14.01",
+    "metadata": {
+        "comments": "This parameters file deploys the base foundation NSG.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "entity": {
+            "value": "MAF"
+        },
+        "service": {
+            "value": "NET"
+        },
+        "locationFull": {
+            "value": "australiasoutheast"
+        },
+        "omslocationFull": {
+            "value": "australiasoutheast"
+        },
+        "environment": {
+            "value": "PRD"
+        },
+        "subnetType": {
+            "value": "APP"
+        },
+        "subnetAddress": {
+            "value": "10.50.1.0/24"
+        },
+        "tagCreatedBy": {
+            "value": "MOQdigital"
+        },
+        "tagEnvironment": {
+            "value": "PRD"
+        },
+        "tagOwner": {
+            "value": "MOQdigital"
+        },
+        "tagProject": {
+            "value": "Foundation"
+        }
+    }
+}

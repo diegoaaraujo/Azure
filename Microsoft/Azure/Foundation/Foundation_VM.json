@@ -1,0 +1,630 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "2020.07.14.01",
+    "metadata": {
+        "comments": "This template deploys a base foundation VM. Requires access to the foundation KeyVault for the VM and domain join passwords.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "entity": {
+            "type": "string",
+            "metadata": {
+                "description": "The Entity name."
+            }
+        },
+        "service": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 3,
+            "metadata": {
+                "description": "Service abbreviation, e.g. CRM."
+            }
+        },
+        "locationFull": {
+            "type": "string",
+            "allowedValues": [
+                "australiaeast",
+                "australiasoutheast",
+                "eastasia",
+                "southeastasia"
+            ],
+            "metadata": {
+                "description": "Region to which the VM is being deployed."
+            }
+        },
+        "omslocationFull": {
+            "type": "string",
+            "allowedValues": [
+                "australiaeast",
+                "australiasoutheast",
+                "eastasia",
+                "southeastasia"
+            ],
+            "metadata": {
+                "description": "The location of the OMS workspace being deployed to."
+            }
+        },
+        "environment": {
+            "type": "string",
+            "allowedValues": [
+                "PRD",
+                "NPRD"
+            ],
+            "metadata": {
+                "description": "Environment contains the abbreviation of the environment that you are deploying to."
+            }
+        },
+        "role": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 4,
+            "metadata": {
+                "description": "VM Role abbreviation, e.g. WFE for Web Front End."
+            }
+        },
+        "vmAdminPassword": {
+            "type": "securestring",
+            "minLength": 12,
+            "metadata": {
+                "description": "Stored in Infra Key Vault. Parameters file is used to perform a lookup on a secret. Can be a password or the string (text) for an SSH public key for Linux."
+            }
+        },
+        "storageType": {
+            "type": "string",
+            "defaultValue": "Premium_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Premium_LRS"
+            ],
+            "metadata": {
+                "description": "Type of storage being deployed to the VM."
+            }
+        },
+        "vmSize": {
+            "type": "string",
+            "allowedValues": [
+                "Standard_A1_v2",
+                "Standard_A2_v2",
+                "Standard_A4_v2",
+                "Standard_A8_v2",
+                "Standard_A2m_v2",
+                "Standard_A4m_v2",
+                "Standard_A8m_v2",
+                "Standard_D1_v2",
+                "Standard_D2_v2",
+                "Standard_D3_v2",
+                "Standard_D4_v2",
+                "Standard_D5_v2",
+                "Standard_DS1_v2",
+                "Standard_DS2_v2",
+                "Standard_DS3_v2",
+                "Standard_DS4_v2",
+                "Standard_DS5_v2",
+                "Standard_F1",
+                "Standard_F2",
+                "Standard_F4",
+                "Standard_F8",
+                "Standard_F16",
+                "Standard_F1s",
+                "Standard_F2s",
+                "Standard_F4s",
+                "Standard_F8s",
+                "Standard_B1ms",
+                "Standard_B1s",
+                "Standard_B2ms",
+                "Standard_B2s",
+                "Standard_B4ms",
+                "Standard_B8ms",
+                "Standard_E4-2ds_v4"
+            ],
+            "metadata": {
+                "description": "Size of the VM being deployed."
+            }
+        },
+        "vmStartNumber": {
+            "type": "int",
+            "metadata": {
+                "description": "End number of the VM, e.g. 1 for VMNAME01, 2 for VMNAME02, etc."
+            }
+        },
+        "dataDisksRequired": {
+            "type": "string",
+            "defaultValue": "No",
+            "allowedValues": [
+                "Yes",
+                "No"
+            ],
+            "metadata": {
+                "description": "If the VM requires DataDisks, choose Yes, otherwise choose No."
+            }
+        },
+        "dataDiskSize": {
+            "type": "int",
+            "defaultValue": 127,
+            "allowedValues": [
+                31,
+                63,
+                127,
+                255,
+                511,
+                1023,
+                2047,
+                4095
+            ],
+            "metadata": {
+                "description": "Size for all DataDisks being deployed. Note: 32 & 64GB are not available for SSD. Ignore if no DataDisks are required."
+            }
+        },
+        "numberOfDataDisks": {
+            "type": "int",
+            "defaultValue": 1,
+            "allowedValues": [
+                1,
+                2,
+                3,
+                4
+            ],
+            "metadata": {
+                "description": "Number of DataDisks to be deployed. Ignore if no DataDisks are required."
+            }
+        },
+        "vmTimeZone": {
+            "type": "string",
+            "defaultValue": "E. Australia Standard Time",
+            "metadata": {
+                "description": "Timezone for the VM OS."
+            }
+        },
+        "subnet": {
+            "type": "string",
+            "metadata": {
+                "description": "Subnet to which the VM will be deployed. E.g. 'APP'"
+            }
+        },
+        "osType": {
+            "type": "string",
+            "defaultValue": "windows",
+            "allowedValues": [
+                "windows",
+                "linux"
+            ],
+            "metadata": {
+                "description": "Subnet to which the VM will be deployed. E.g. 'APP'"
+            }
+        },
+        "linuxAuthentication": {
+            "type": "string",
+            "defaultValue": "password",
+            "allowedValues": [
+                "sshPublicKey",
+                "password"
+            ],
+            "metadata": {
+                "description": "Type of authentication to use on the Virtual Machine. SSH key can be used if required. Create the SSH key (use 'ssh-keygen -m PEM -t rsa -b 4096') and copy the public key string to the INF Key Vault as a secret."
+            }
+        },
+        "vmsku": {
+            "type": "string",
+            "defaultValue": "2019-Datacenter",
+            "metadata": {
+                "description": "Sku for the VM."
+            }
+        },
+        "publisher": {
+            "type": "string",
+            "defaultValue": "MicrosoftWindowsServer",
+            "metadata": {
+                "description": "Publisher for the VM."
+            }
+        },
+        "offer": {
+            "type": "string",
+            "defaultValue": "WindowsServer",
+            "metadata": {
+                "description": "Offer for the VM."
+            }
+        },
+        "publicIPRequired": {
+            "type": "string",
+            "defaultValue": "No",
+            "allowedValues": [
+                "Yes",
+                "No"
+            ],
+            "metadata": {
+                "description": "If the VM requires a Public IP, choose Yes, otherwise choose No."
+            }
+        },
+        "joinDomain": {
+            "type": "string",
+            "defaultValue": "No",
+            "allowedValues": [
+                "Yes",
+                "No"
+            ],
+            "metadata": {
+                "description": "If the VM is to be joined to the MGT Domain, choose Yes, otherwise choose No."
+            }
+        },
+        "domainJoinPassword": {
+            "type": "securestring",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Password for the domain join user account."
+            }
+        },
+        "domainJoinUser": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Domain user account to use for domain join."
+            }
+        },
+        "domainOU": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Domain OU to join the computer accounts to."
+            }
+        },
+        "tagCreatedBy": {
+            "type": "string",
+            "metadata": {
+                "description": "The Created By Tag"
+            }
+        },
+        "tagEnvironment": {
+            "type": "string",
+            "metadata": {
+                "description": "The Environment Tag"
+            }
+        },
+        "tagOwner": {
+            "type": "string",
+            "metadata": {
+                "description": "The Owner Tag"
+            }
+        },
+        "tagProject": {
+            "type": "string",
+            "metadata": {
+                "description": "The Project Tag"
+            }
+        }
+    },
+    "variables": {
+        "region": {
+            "australiaeast": "AE",
+            "australiasoutheast": "ASE",
+            "eastasia": "EA",
+            "southeastasia": "SEA"
+        },
+        "storageAccountName": "[toLower(concat(parameters('entity'),'sa',parameters('service'),'gen',parameters('environment'),variables('region')[parameters('locationFull')]))]",
+        "availabilitySetName": "[toUpper(concat(parameters('entity'),'-AS-',parameters('service'),'-',substring(parameters('environment'),0,1),parameters('role'),'-',variables('region')[parameters('locationFull')]))]",
+        "vmName": "[toUpper(concat(parameters('entity'),'V',parameters('service'),'-',substring(parameters('environment'),0,1),parameters('role'),padLeft(parameters('vmStartNumber'),2,'0')))]",
+        "copy": [
+            {
+                "name": "dataDisks",
+                "count": "[parameters('numberOfDataDisks')]",
+                "sku": {
+                    "name": "[parameters('storageType')]"
+                },
+                "input": {
+                    "lun": "[copyIndex('dataDisks', 1)]",
+                    "name": "[concat(variables('vmName'),'-DataDisk0',copyIndex('dataDisks', 1))]",
+                    "createOption": "Empty",
+                    "diskSizeGB": "[parameters('dataDiskSize')]"
+                }
+            }
+        ],
+        "vmPIPName": "[concat(variables('vmName'),'-PIP')]",
+        "vmNICName": "[concat(variables('vmName'),'-NIC')]",
+        "vmAdminUsername": "[concat(parameters('entity'),'-',parameters('service'),'-Admin')]",
+        "vNetName": "[toUpper(concat(parameters('entity'),'-VNET-NET-',parameters('environment'),'-',variables('region')[parameters('locationFull')]))]",
+        "publicIPId": {
+            "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('vmPipName'))]"
+        },
+        "windowsConfiguration": {
+            "provisionVMAgent": true,
+            "enableAutomaticUpdates": true,
+            "timeZone": "[parameters('vmTimeZone')]"
+        },
+        "linuxConfiguration": {
+            "disablePasswordAuthentication": true,
+            "ssh": {
+                "publicKeys": [
+                    {
+                        "path": "[concat('/home/', variables('vmAdminUsername'), '/.ssh/authorized_keys')]",
+                        "keyData": "[parameters('vmAdminPassword')]"
+                    }
+                ]
+            }
+        },
+        "subnetResourceId": "[concat(resourceId(concat(parameters('entity'),'-RG-',variables('region')[parameters('locationFull')],'-NET-',parameters('environment')),'Microsoft.Network/virtualNetworks',variables('vNetName')),'/subnets/',toUpper(concat(parameters('entity'),'-SNET-NET-',parameters('subnet'),'-',parameters('environment'),'-',variables('region')[parameters('locationFull')])))]",
+        "omsWorkspaceName": "[toUpper(concat(parameters('entity'),'-OMS-INF-',parameters('environment'),'-',variables('region')[parameters('omslocationFull')]))]",
+        "omsWorkspaceId": "[concat(resourceId(concat(parameters('entity'),'-RG-',variables('region')[parameters('omslocationFull')],'-INF-',parameters('environment')),'microsoft.operationalinsights/workspaces/',variables('omsWorkspaceName')))]",
+        "daExtensionName": "[if(equals(toLower(parameters('osType')),'windows'),'DependencyAgentWindows','DependencyAgentLinux')]",
+        "daExtensionType": "[if(equals(toLower(parameters('osType')),'windows'),'DependencyAgentWindows','DependencyAgentLinux')]",
+        "daExtensionVersion": "9.5",
+        "mmaExtensionName": "[if(equals(toLower(parameters('osType')),'windows'),'MMAExtension','OMSExtension')]",
+        "mmaExtensionType": "[if(equals(toLower(parameters('osType')),'windows'),'MicrosoftMonitoringAgent','OmsAgentForLinux')]",
+        "mmaExtensionVersion": "[if(equals(toLower(parameters('osType')),'windows'),'1.0','1.4')]"
+    },
+    "resources": [
+        {
+            "name": "[variables('storageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2019-06-01",
+            "sku": {
+                "name": "Standard_GRS"
+            },
+            "kind": "StorageV2",
+            "location": "[parameters('locationFull')]",
+            "tags": {
+                "Created By": "[parameters('tagCreatedBy')]",
+                "Environment": "[parameters('tagEnvironment')]",
+                "Owner": "[parameters('tagOwner')]",
+                "Project": "[parameters('tagProject')]"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "encryption": {
+                    "services": {
+                        "blob": {
+                            "enabled": true
+                        },
+                        "file": {
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                },
+                "supportsHttpsTrafficOnly": true
+            }
+        },
+        {
+            "type": "Microsoft.Compute/availabilitySets",
+            "name": "[variables('availabilitySetName')]",
+            "apiVersion": "2016-04-30-preview",
+            "location": "[parameters('locationFull')]",
+            "properties": {
+                "platformFaultDomainCount": 2,
+                "platformUpdateDomainCount": 2,
+                "managed": true
+            }
+        },
+        {
+            "condition": "[equals(parameters('publicIPRequired'), 'Yes')]",
+            "apiVersion": "2017-06-01",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('vmPIPName')]",
+            "location": "[parameters('locationFull')]",
+            "tags": {
+                "Created By": "[parameters('tagCreatedBy')]",
+                "Environment": "[parameters('tagEnvironment')]",
+                "Owner": "[parameters('tagOwner')]",
+                "Project": "[parameters('tagProject')]"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[toLower(concat(variables('vmName')))]"
+                }
+            }
+        },
+        {
+            "name": "[variables('vmNICName')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2017-10-01",
+            "location": "[parameters('locationFull')]",
+            "dependsOn": [
+                "[variables('vmPIPName')]"
+            ],
+            "tags": {
+                "Created By": "[parameters('tagCreatedBy')]",
+                "Environment": "[parameters('tagEnvironment')]",
+                "Owner": "[parameters('tagOwner')]",
+                "Project": "[parameters('tagProject')]"
+            },
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[variables('subnetResourceId')]"
+                            },
+                            "publicIPAddress": "[if(equals(parameters('publicIPRequired'),'Yes'), variables('publicIPId'), json('null'))]"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[variables('vmName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2019-12-01",
+            "location": "[parameters('locationFull')]",
+            "tags": {
+                "Created By": "[parameters('tagCreatedBy')]",
+                "Environment": "[parameters('tagEnvironment')]",
+                "Owner": "[parameters('tagOwner')]",
+                "Project": "[parameters('tagProject')]"
+            },
+            "dependsOn": [
+                "[variables('availabilitySetName')]",
+                "[variables('vmNICName')]",
+                "[variables('storageAccountName')]"
+            ],
+            "properties": {
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets', variables('availabilitySetName'))]"
+                },
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vmSize')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[parameters('publisher')]",
+                        "offer": "[parameters('offer')]",
+                        "sku": "[parameters('vmsku')]",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "name": "[concat(variables('vmName'),'-OSDisk')]",
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[parameters('storageType')]"
+                        }
+                    },
+                    "dataDisks": "[if(equals(parameters('dataDisksRequired'),'Yes'), variables('dataDisks'), json('null'))]"
+                },
+                "osProfile": {
+                    "computerName": "[variables('vmName')]",
+                    "adminUsername": "[variables('vmAdminUsername')]",
+                    "adminPassword": "[parameters('vmAdminPassword')]",
+                    "windowsConfiguration": "[if(equals(parameters('osType'),'Windows'), variables('windowsConfiguration'), json('null'))]",
+                    "linuxConfiguration": "[if(equals(parameters('linuxAuthentication'), 'password'), json('null'), variables('linuxConfiguration'))]"
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceid('Microsoft.Network/networkInterfaces', variables('vmNICName'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[reference(concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName')), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).primaryEndpoints.blob]"
+                    }
+                }
+            }
+        },
+        {
+            "condition": "[equals(parameters('osType'), 'windows')]",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('vmName'), '/BGInfo')]",
+            "apiVersion": "2018-06-01",
+            "location": "[parameters('locationFull')]",
+            "scale": null,
+            "properties": {
+                "publisher": "Microsoft.Compute",
+                "type": "BGInfo",
+                "typeHandlerVersion": "2.1",
+                "autoUpgradeMinorVersion": true
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', variables('vmName'))]"
+            ]
+        },
+        {
+            "condition": "[equals(parameters('osType'), 'windows')]",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('vmName'),'/IaaSAntimalware')]",
+            "apiVersion": "2018-06-01",
+            "location": "[parameters('locationFull')]",
+            "scale": null,
+            "properties": {
+                "publisher": "Microsoft.Azure.Security",
+                "type": "IaaSAntimalware",
+                "typeHandlerVersion": "1.5",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "AntimalwareEnabled": true,
+                    "ScheduledScanSettings": {
+                        "isEnabled": true,
+                        "day": 7,
+                        "time": 120,
+                        "scanType": "Full"
+                    },
+                    "Exclusions": {
+                        "Paths": null,
+                        "Extensions": null,
+                        "Processes": null
+                    },
+                    "RealtimeProtectionEnabled": true
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', variables('vmName'))]"
+            ]
+        },
+        {
+            "condition": "[equals(parameters('joinDomain'), 'Yes')]",
+            "apiVersion": "2015-06-15",
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('vmName'),'/joindomain')]",
+            "location": "[parameters('locationFull')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'))]"
+            ],
+            "properties": {
+                "publisher": "Microsoft.Compute",
+                "type": "JsonADDomainExtension",
+                "typeHandlerVersion": "1.3",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "Name": "mgt.bdo.global",
+                    "OUPath": "[parameters('domainOU')]",
+                    "User": "[parameters('domainJoinUser')]",
+                    "Restart": "true",
+                    "Options": 3
+                },
+                "protectedsettings": {
+                    "Password": "[parameters('domainJoinPassword')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2019-12-01",
+            "name": "[concat(variables('vmName'),'/', variables('daExtensionName'))]",
+            "location": "[parameters('locationFull')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/',variables('vmName'))]"
+            ],
+            "properties": {
+                "publisher": "Microsoft.Azure.Monitoring.DependencyAgent",
+                "type": "[variables('daExtensionType')]",
+                "typeHandlerVersion": "[variables('daExtensionVersion')]",
+                "autoUpgradeMinorVersion": false,
+                "enableAutomaticUpgrade": false,
+                "settings": {
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2017-12-01",
+            "name": "[concat(variables('vmName'),'/', variables('mmaExtensionName'))]",
+            "location": "[parameters('locationFull')]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', variables('vmName'))]"
+            ],
+            "properties": {
+                "publisher": "Microsoft.EnterpriseCloud.Monitoring",
+                "type": "[variables('mmaExtensionType')]",
+                "typeHandlerVersion": "[variables('mmaExtensionVersion')]",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "workspaceId": "[reference(variables('omsWorkspaceId'), '2015-03-20').customerId]",
+                    "stopOnMultipleConnections": true
+                },
+                "protectedSettings": {
+                    "workspaceKey": "[listKeys(variables('omsWorkspaceId'), '2015-03-20').primarySharedKey]"
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "vmAdminUsername": {
+            "type": "string",
+            "value": "[variables('vmAdminUsername')]"
+        }
+    }
+}

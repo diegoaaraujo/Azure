@@ -1,0 +1,122 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "2020.06.22.01",
+  "metadata": {
+    "comments": "This template deploys a base foundation KeyVault to be used by the deployment for secured keys. It should be deployed to the INF Resource Group and requires an AAD group to be available.",
+    "author": "Colin Roche, MOQdigital"
+  },
+  "parameters": {
+    "entity": {
+      "type": "string",
+      "metadata": {
+        "description": "The Entity name."
+      }
+    },
+    "locationFull": {
+      "type": "string",
+      "allowedValues": [
+        "australiaeast",
+        "australiasoutheast",
+        "eastasia",
+        "southeastasia"
+      ],
+      "metadata": {
+        "description": "Region to which the VM is being deployed."
+      }
+    },
+    "environment": {
+      "type": "string",
+      "allowedValues": [
+        "PRD",
+        "NPRD"
+      ],
+      "metadata": {
+        "description": "Environment contains the abbreviation of the environment that you are deploying to."
+      }
+    },
+    "tagCreatedBy": {
+      "type": "string",
+      "metadata": {
+        "description": "Value for the 'Created By' tag."
+      }
+    },
+    "tagEnvironment": {
+      "type": "string",
+      "metadata": {
+        "description": "Value for the 'Environment' tag."
+      }
+    },
+    "tagOwner": {
+      "type": "string",
+      "metadata": {
+        "description": "Value for the 'Pwner' tag."
+      }
+    },
+    "tagProject": {
+      "type": "string",
+      "metadata": {
+        "description": "Value for the 'Project' tag."
+      }
+    }
+  },
+  "variables": {
+    "region": {
+      "australiaeast": "AE",
+      "australiasoutheast": "ASE",
+      "eastasia": "EA",
+      "southeastasia": "SEA"
+    },
+    "infrastructureRGName": "[toUpper(concat(parameters('entity'),'-RG-',variables('region')[parameters('locationFull')],'-INF-',parameters('environment')))]",
+    "networkRGName": "[toUpper(concat(parameters('entity'),'-RG-',variables('region')[parameters('locationFull')],'-NET-',parameters('environment')))]",
+    "rsvRGName": "[toUpper(concat(parameters('entity'),'-RG-',variables('region')[parameters('locationFull')],'-RSV-',parameters('environment')))]"
+  },
+  "resources": [
+    {
+      "comments": "Deploys the Infrastructure Resource Group for the region.",
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2019-10-01",
+      "name": "[variables('infrastructureRGName')]",
+      "location": "[parameters('locationFull')]",
+      "tags": {
+        "Created By": "[parameters('tagCreatedBy')]",
+        "Environment": "[parameters('tagEnvironment')]",
+        "Owner": "[parameters('tagOwner')]",
+        "Project": "[parameters('tagProject')]"
+      },
+      "properties": {
+      }
+    },
+    {
+      "comments": "Deploys the Network Resource Group for the region.",
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2019-10-01",
+      "name": "[variables('networkRGName')]",
+      "location": "[parameters('locationFull')]",
+      "tags": {
+        "Created By": "[parameters('tagCreatedBy')]",
+        "Environment": "[parameters('tagEnvironment')]",
+        "Owner": "[parameters('tagOwner')]",
+        "Project": "[parameters('tagProject')]"
+      },
+      "properties": {
+      }
+    },
+    {
+      "comments": "Deploys the Recovery Services Vault Resource Group for the region.",
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2019-10-01",
+      "name": "[variables('rsvRGName')]",
+      "location": "[parameters('locationFull')]",
+      "tags": {
+        "Created By": "[parameters('tagCreatedBy')]",
+        "Environment": "[parameters('tagEnvironment')]",
+        "Owner": "[parameters('tagOwner')]",
+        "Project": "[parameters('tagProject')]"
+      },
+      "properties": {
+      }
+    }
+  ],
+  "outputs": {
+  }
+}

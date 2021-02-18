@@ -1,0 +1,174 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "2020.06.23.01",
+    "metadata": {
+        "comments": "This template deploys a base foundation VNet with two subnets. It relies on associated parameter file to determine settings for the deployment.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "entity": {
+            "type": "string",
+            "metadata": {
+                "description": "The Entity name."
+            }
+        },
+        "service": {
+            "type": "string",
+            "metadata": {
+                "description": "The service."
+            }
+        },
+        "locationFull": {
+            "type": "string",
+            "allowedValues": [
+                "australiaeast",
+                "australiasoutheast",
+                "eastasia",
+                "southeastasia"
+            ],
+            "metadata": {
+                "description": "The primary location 'Full' being deployed to."
+            }
+        },
+        "environment": {
+            "type": "string",
+            "allowedValues": [
+                "PRD",
+                "NPRD"
+            ],
+            "metadata": {
+                "description": "The type of environment being deployed"
+            }
+        },
+        "vnetAddress": {
+            "type": "string",
+            "metadata": {
+                "description": "The CIDR address for the VNET"
+            }
+        },
+        "subnet1Type": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "metadata": {
+                "description": "The name for Subnet 1, e.g. 'DMZ'"
+            }
+        },
+        "subnet1Address": {
+            "type": "string",
+            "metadata": {
+                "description": "The CIDR address for Subnet 1"
+            }
+        },
+        "subnet2Type": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "metadata": {
+                "description": "The name for Subnet 2, e.g. 'APP'"
+            }
+        },
+        "subnet2Address": {
+            "type": "string",
+            "metadata": {
+                "description": "The CIDR address for the APP SNET"
+            }
+        },
+        "gatewaySubnetAddress": {
+            "type": "string",
+            "metadata": {
+                "description": "The CIDR address for the Gateway SNET"
+            }
+        },
+        "tagCreatedBy": {
+            "type": "string",
+            "metadata": {
+                "description": "The createdBy Tag"
+            }
+        },
+        "tagEnvironment": {
+            "type": "string",
+            "metadata": {
+                "description": "The environment Tag"
+            }
+        },
+        "tagOwner": {
+            "type": "string",
+            "metadata": {
+                "description": "The owner Tag"
+            }
+        },
+        "tagProject": {
+            "type": "string",
+            "metadata": {
+                "description": "The project Tag"
+            }
+        }
+    },
+    "variables": {
+        "region": {
+            "australiaeast": "AE",
+            "australiasoutheast": "ASE",
+            "eastasia": "EA",
+            "southeastasia": "SEA"
+        },
+        "vnetResourceGroupName": "[toUpper(concat(parameters('Entity'),'-RG-',variables('region')[parameters('locationFull')],'-NET-',parameters('environment')))]",
+        "vnetName": "[concat(parameters('Entity'),'-VNET-',parameters('Service'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')])]",
+        "vnetSubnet1": "[concat(parameters('Entity'),'-SNET-',parameters('Service'),'-',parameters('Subnet1Type'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')])]",
+        "vnetSubnet2": "[concat(parameters('Entity'),'-SNET-',parameters('Service'),'-',parameters('Subnet2Type'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')])]",
+        "vnetNSG1": "[concat(parameters('Entity'),'-NSG-SNET-',parameters('Service'),'-',parameters('Subnet1Type'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')])]",
+        "vnetNSG2": "[concat(parameters('Entity'),'-NSG-SNET-',parameters('Service'),'-',parameters('Subnet2Type'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')])]",
+        "subnet1Id": "[resourceId(variables('VNETResourceGroupName'),'Microsoft.Network/networkSecurityGroups/', variables('vnetNSG1'))]",
+        "subnet2Id": "[resourceId(variables('VNETResourceGroupName'),'Microsoft.Network/networkSecurityGroups/', variables('vnetNSG2'))]"
+    },
+    "resources": [
+        {
+            "comments": "Deploys the VNet, two standard subnets and a gateway subnet.",
+            "name": "[variables('vnetName')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "location": "[parameters('LocationFull')]",
+            "apiVersion": "2020-04-01",
+            "tags": {
+                "Created By": "[parameters('tagCreatedBy')]",
+                "Environment": "[parameters('tagEnvironment')]",
+                "Owner": "[parameters('tagOwner')]",
+                "Project": "[parameters('tagProject')]"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('VNETAddress')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('vnetSubnet1')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('Subnet1Address')]",
+                            "networkSecurityGroup": {
+                                "id": "[variables('subnet1Id')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "[variables('vnetSubnet2')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('Subnet2Address')]",
+                            "networkSecurityGroup": {
+                                "id": "[variables('subnet2Id')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "GatewaySubnet",
+                        "properties": {
+                            "addressPrefix": "[parameters('GatewaySubnetAddress')]"
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {
+    }
+}

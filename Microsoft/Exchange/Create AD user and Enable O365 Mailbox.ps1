@@ -1,6 +1,6 @@
 #  
 #add exchange snap-in
-Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn;
+#Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn;
 
 #get username with input
 "";
@@ -9,17 +9,17 @@ Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn;
 
 
 #get first and lastname with input
-$firstname = Read-Host "Vorname";
-$lastname = Read-Host "Nachname";
+$firstname = Read-Host "First Name";
+$lastname = Read-Host "Last Name";
 
 $username = $firstname + "." + $lastname;
-$username_domain = $username + '@faber.int';
+$username_domain = $username + '@wdrc.qld.gov.au';
 
 $name = $firstname + $lastname;
 $displayname = $firstname + " " + $lastname;
 
 #get password with input
-$password = Read-Host "Passwort vergeben" -AsSecureString;
+$password = Read-Host "Password" -AsSecureString;
 
 #get Organisation Unit with input
 #$ou_input = Read-Host "Organisation Unit";

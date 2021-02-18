@@ -1,0 +1,291 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "2020.07.14.01",
+    "metadata": {
+        "comments": "This template deploys a base foundation NSG. It should first be deployed after the KeyVault and before the VNet and used for all ongoing changes to the rules.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "entity": {
+            "type": "string",
+            "metadata": {
+                "description": "The Entity name."
+            }
+        },
+        "service": {
+            "type": "string",
+            "metadata": {
+                "description": "The service."
+            }
+        },
+        "locationFull": {
+            "type": "string",
+            "allowedValues": [
+                "australiaeast",
+                "australiasoutheast",
+                "eastasia",
+                "southeastasia"
+            ],
+            "metadata": {
+                "description": "The primary location 'Full' being deployed to."
+            }
+        },
+        "omslocationFull": {
+            "type": "string",
+            "allowedValues": [
+                "australiaeast",
+                "australiasoutheast",
+                "eastasia",
+                "southeastasia"
+            ],
+            "metadata": {
+                "description": "The location of the OMS workspace being deployed to."
+            }
+        },
+        "environment": {
+            "type": "string",
+            "allowedValues": [
+                "PRD",
+                "NPRD"
+            ],
+            "metadata": {
+                "description": "The type of environment being deployed"
+            }
+        },
+        "subnetType": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "metadata": {
+                "description": "The name for Subnet 1, e.g. 'DMZ'"
+            }
+        },
+        "subnetAddress": {
+            "type": "string",
+            "metadata": {
+                "description": "The CIDR address for Subnet 1"
+            }
+        },
+        "tagCreatedBy": {
+            "type": "string",
+            "metadata": {
+                "description": "The createdBy Tag"
+            }
+        },
+        "tagEnvironment": {
+            "type": "string",
+            "metadata": {
+                "description": "The environment Tag"
+            }
+        },
+        "tagOwner": {
+            "type": "string",
+            "metadata": {
+                "description": "The owner Tag"
+            }
+        },
+        "tagProject": {
+            "type": "string",
+            "metadata": {
+                "description": "The project Tag"
+            }
+        }
+    },
+    "variables": {
+        "region": {
+            "australiaeast": "AE",
+            "australiasoutheast": "ASE",
+            "eastasia": "EA",
+            "southeastasia": "SEA"
+        },
+        "vnet-NSGName": "[concat(parameters('Entity'),'-NSG-SNET-',parameters('Service'),'-',parameters('subnetType'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')])]",
+        "omsWorkspaceName": "[toUpper(concat(parameters('entity'),'-OMS-INF-',parameters('environment'),'-',variables('region')[parameters('omslocationFull')]))]",
+        "storageaccountName": "[toLower(concat(parameters('entity'),'sa','inf',parameters('environment'),variables('region')[parameters('omslocationFull')]))]",
+        "omsWorkspaceId": "[concat(resourceId(concat(parameters('entity'),'-RG-',variables('region')[parameters('omslocationFull')],'-INF-',parameters('environment')),'microsoft.operationalinsights/workspaces/',variables('omsWorkspaceName')))]",
+        "storageaccountId": "[toLower(concat(resourceId(concat(parameters('entity'),'-RG-',variables('region')[parameters('omslocationFull')],'-INF-',parameters('environment')),'Microsoft.Storage/storageAccounts/', variables('storageAccountName'))))]"
+    },
+    "resources": [
+        {
+            "comments": "NSG rules for the second subnet NSG in the foundation environment.",
+            "name": "[variables('vnet-NSGName')]",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "location": "[parameters('LocationFull')]",
+            "apiVersion": "2020-04-01",
+            "tags": {
+                "Created By": "[parameters('tagCreatedBy')]",
+                "Environment": "[parameters('tagEnvironment')]",
+                "Owner": "[parameters('tagOwner')]",
+                "Project": "[parameters('tagProject')]"
+            },
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "INTRA-SUBNET-INBOUND",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "[parameters('subnetAddress')]",
+                            "destinationAddressPrefix": "[parameters('subnetAddress')]",
+                            "access": "Allow",
+                            "priority": 4093,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "AzureLoadBalancerInbound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "AzureLoadBalancer",
+                            "destinationAddressPrefix": "[parameters('subnetAddress')]",
+                            "access": "Allow",
+                            "priority": 4094,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "AzureInfrastructureInbound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "168.63.129.16",
+                            "destinationAddressPrefix": "[parameters('subnetAddress')]",
+                            "access": "Allow",
+                            "priority": 4095,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "EXPLICITYDENYINBOUND",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Deny",
+                            "priority": 4096,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "[concat('S.SNET-',parameters('subnetType'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')],'_D.ANY_KMS.1688')]",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "1688",
+                            "sourceAddressPrefix": "[parameters('subnetAddress')]",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 4091,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "[concat('S.SNET-',parameters('subnetType'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')],'_D.INTERNET_ANY.ANY')]",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "[parameters('subnetAddress')]",
+                            "destinationAddressPrefix": "Internet",
+                            "access": "Allow",
+                            "priority": 4092,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "INTRA-SUBNET-OUTBOUND",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "[parameters('subnetAddress')]",
+                            "destinationAddressPrefix": "[parameters('subnetAddress')]",
+                            "access": "Allow",
+                            "priority": 4093,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "AzureLoadBalancerOutbound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "AzureLoadBalancer",
+                            "access": "Allow",
+                            "priority": 4094,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "AzureInfrastructureOutbound",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "[parameters('subnetAddress')]",
+                            "destinationAddressPrefix": "168.63.129.16",
+                            "access": "Allow",
+                            "priority": 4095,
+                            "direction": "Outbound"
+                        }
+                    },
+                    {
+                        "name": "EXPLICITYDENYOUTBOUND",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Deny",
+                            "priority": 4096,
+                            "direction": "Outbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/providers/diagnosticSettings",
+            "name": "[concat(variables('vnet-NSGName'), '/microsoft.insights/', variables('omsWorkspaceName'))]",
+            "apiVersion": "2017-05-01-preview",
+            "properties": {
+                "name": "[variables('omsWorkspaceName')]",
+                "storageAccountId": "[variables('storageaccountId')]",
+                "workspaceId": "[variables('omsworkspaceId')]",
+                "logs": [
+                    {
+                        "category": "NetworkSecurityGroupEvent",
+                        "enabled": true,
+                        "retentionPolicy": {
+                            "days": 7,
+                            "enabled": false
+                        }
+                    },
+                    {
+                        "category": "NetworkSecurityGroupRuleCounter",
+                        "enabled": true,
+                        "retentionPolicy": {
+                            "days": 7,
+                            "enabled": false
+                        }
+                    }
+                ],
+                "metrics": [
+                ]
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups/', variables('vnet-NSGName'))]"
+            ]
+        }
+    ],
+    "outputs": {
+    }
+}

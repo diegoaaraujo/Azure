@@ -1,0 +1,183 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "2020.06.23.01",
+    "metadata": {
+        "comments": "This template deploys a base foundation VNet Gateway. It relies on associated parameter file to determine settings for the deployment.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "entity": {
+            "type": "string",
+            "metadata": {
+                "description": "The Entity name."
+            }
+        },
+        "service": {
+            "type": "string",
+            "metadata": {
+                "description": "The service."
+            }
+        },
+        "locationFull": {
+            "type": "string",
+            "allowedValues": [
+                "australiaeast",
+                "australiasoutheast",
+                "eastasia",
+                "southeastasia"
+            ],
+            "metadata": {
+                "description": "The primary location 'Full' being deployed to."
+            }
+        },
+        "environment": {
+            "type": "string",
+            "allowedValues": [
+                "PRD",
+                "NPRD"
+            ],
+            "metadata": {
+                "description": "The type of environment being deployed"
+            }
+        },
+        "gatewayType": {
+            "type": "string",
+            "allowedValues": [
+                "ExpressRoute",
+                "VPN"
+            ],
+            "metadata": {
+                "description": "The type of VNet Gateway being deployed."
+            }
+        },
+        "gatewaySKU": {
+            "type": "string",
+            "allowedValues": [
+                "Standard",
+                "HighPerformance",
+                "UltraPerformance",
+                "VpnGw1",
+                "VpnGw2",
+                "VpnGw3",
+                "VpnGw4",
+                "VpnGw5"
+            ],
+            "metadata": {
+                "description": "The SKU of the VNet Gateway."
+            }
+        },
+        "vpnType": {
+            "type": "string",
+            "allowedValues": [
+                "RouteBased",
+                "PolicyNased"
+            ],
+            "metadata": {
+                "description": "The SKU of the VNet Gateway."
+            }
+        },
+        "tagCreatedBy": {
+            "type": "string",
+            "metadata": {
+                "description": "The createdBy Tag"
+            }
+        },
+        "tagEnvironment": {
+            "type": "string",
+            "metadata": {
+                "description": "The environment Tag"
+            }
+        },
+        "tagOwner": {
+            "type": "string",
+            "metadata": {
+                "description": "The owner Tag"
+            }
+        },
+        "tagProject": {
+            "type": "string",
+            "metadata": {
+                "description": "The project Tag"
+            }
+        }
+    },
+    "variables": {
+        "region": {
+            "australiaeast": "AE",
+            "australiasoutheast": "ASE",
+            "eastasia": "EA",
+            "southeastasia": "SEA"
+        },
+        "vnetName": "[concat(parameters('Entity'),'-VNET-',parameters('Service'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')])]",
+        "vnetGatewayPublicIpName": "[toUpper(concat(parameters('entity'),'-VGW-',parameters('service'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')],'-PIP'))]",
+        "vnetGatewayPublicIpDNS": "[toLower(concat(parameters('entity'),'-VGW-',parameters('service'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')]))]",
+        "vngName": "[concat(parameters('Entity'),'-VNG-','VNET-',parameters('Service'),'-',parameters('Environment'),'-',variables('region')[parameters('locationFull')])]"
+    },
+    "resources": [
+        {
+            "comments": "Deploys the Public IP for the VNet Gateway subnet.",
+            "name": "[variables('vnetGatewayPublicIpName')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-04-01",
+            "location": "[parameters('LocationFull')]",
+            "tags": {
+                "Created By": "[parameters('tagCreatedBy')]",
+                "Environment": "[parameters('tagEnvironment')]",
+                "Owner": "[parameters('tagOwner')]",
+                "Project": "[parameters('tagProject')]"
+            },
+            "sku": {
+                "name": "Basic"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "publicIPAddressVersion": "IPv4",
+                "dnsSettings": {
+                    "domainNameLabel": "[tolower(variables('vnetGatewayPublicIpDNS'))]"
+                }
+            }
+        },
+        {
+            "comments": "Deploys the VNet Gateway.",
+            "name": "[variables('vngName')]",
+            "type": "Microsoft.Network/virtualNetworkGateways",
+            "apiVersion": "2020-04-01",
+            "location": "[parameters('LocationFull')]",
+            "tags": {
+                "Created By": "[parameters('tagCreatedBy')]",
+                "Environment": "[parameters('tagEnvironment')]",
+                "Owner": "[parameters('tagOwner')]",
+                "Project": "[parameters('tagProject')]"
+            },
+            "dependsOn": [
+                "[variables('vnetGatewayPublicIpName')]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "[concat(variables('vnetName'),'-IP-Config')]",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets',variables('vnetName'), 'GatewaySubnet')]"
+                            },
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('vnetGatewayPublicIpName'))]"
+                            }
+                        }
+                    }
+                ],
+                "sku": {
+                    "name": "[parameters('gatewaySKU')]",
+                    "tier": "[parameters('gatewaySKU')]"
+                },
+                "gatewayType": "[parameters('gatewayType')]",
+                "vpnType": "[if(equals(parameters('gatewayType'),'VPN'), parameters('vpnType'), json('null'))]",
+                "enableBgp": "[if(equals(parameters('gatewayType'),'VPN'), 'true', json('null'))]",
+                "activeActive": false
+            }
+        }
+    ],
+    "outputs": {
+    }
+}

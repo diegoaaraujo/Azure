@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "2019.09.30.1",
+  "metadata": {
+    "comments": "This parameters file deploys KeyVault.",
+    "author": "Colin Roche, MOQdigital"
+  },
+  "parameters": {
+    "entity": {
+      "value": "MAF"
+    },
+    "service": {
+      "value": "INF"
+    },
+    "locationFull": {
+      "value": "australiasoutheast"
+    },
+    "environment": {
+      "value": "PRD"
+    },
+    "role": {
+      "value": "GEN"
+    },
+    "ownersGroupObjectId01": {
+      "value": "40408494-e189-4357-8e0a-ec39be0c3e22"
+    },
+    "omsWorkspacesku": {
+      "value": "PerGB2018"
+    },
+    "omsdataRetention": {
+      "value": 30
+    },
+    "omsPurgeDataOn30Days": {
+      "value": false
+    },
+    "omsdailyQuotaGb": {
+      "value": 1
+    },
+    "tagCreatedBy": {
+      "value": "MOQdigital"
+    },
+    "tagEnvironment": {
+      "value": "PRD"
+    },
+    "tagOwner": {
+      "value": "MOQdigital"
+    },
+    "tagProject": {
+      "value": "Roundation"
+    }
+  }
+}

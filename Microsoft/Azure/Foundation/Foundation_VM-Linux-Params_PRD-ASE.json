@@ -1,0 +1,102 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "2020.07.30.01",
+    "metadata": {
+        "comments": "This parameters file deploys the base foundation VNet.",
+        "author": "Colin Roche, MOQdigital"
+    },
+    "parameters": {
+        "entity": {
+            "value": "MAF"
+        },
+        "service": {
+            "value": "INF"
+        },
+        "locationFull": {
+            "value": "australiasoutheast"
+        },
+        "omslocationFull": {
+            "value": "australiasoutheast"
+        },
+        "environment": {
+            "value": "PRD"
+        },
+        "role": {
+            "value": "ZZZ"
+        },
+        "vmAdminPassword": {
+            "reference": {
+                "keyVault": {
+                    "id": "/subscriptions/67905429-5d4f-4161-b694-d4d0aed9ccb8/resourceGroups/MAF-RG-ASE-INF-PRD/providers/Microsoft.KeyVault/vaults/MAF-KV-INF-GEN-PRD-ASE"
+                },
+                "secretName": "inf-sshkey"
+            }
+        },
+        "storageType": {
+            "value": "Premium_LRS"
+        },
+        "vmSize": {
+            "value": "Standard_E4-2ds_v4"
+        },
+        "vmStartNumber": {
+            "value": 1
+        },
+        "dataDisksRequired": {
+            "value": "No"
+        },
+        "dataDiskSize": {
+            "value": 63
+        },
+        "numberOfDataDisks": {
+            "value": 1
+        },
+        "vmTimeZone": {
+            "value": "E. Australia Standard Time"
+        },
+        "subnet": {
+            "value": "APP"
+        },
+        "osType": {
+            "value": "linux"
+        },
+        "linuxAuthentication": {
+            "value": "sshPublicKey"
+        },
+        "vmsku": {
+            "value": "18.04-LTS"
+        },
+        "publisher": {
+            "value": "Canonical"
+        },
+        "offer": {
+            "value": "UbuntuServer"
+        },
+        "publicIPRequired": {
+            "value": "No"
+        },
+        "joinDomain": {
+            "value": "No"
+        },
+        "domainJoinPassword": {
+            "value": "none"
+        },
+        "domainJoinUser": {
+            "value": "domainadmin"
+        },
+        "domainOU": {
+            "value": "domainadmin"
+        },
+        "tagCreatedBy": {
+            "value": "MOQdigital"
+        },
+        "tagEnvironment": {
+            "value": "PRD"
+        },
+        "tagOwner": {
+            "value": "MOQdigital"
+        },
+        "tagProject": {
+            "value": "Foundation"
+        }
+    }
+}
