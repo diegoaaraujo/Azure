@@ -2,7 +2,7 @@ Clear-Host
 Write-Verbose "Setting Arguments" -Verbose
 $StartDTM = (Get-Date)	
 
-$MyConfigFileloc = "D:\MDTProduction\Applications\Settings.xml"
+$MyConfigFileloc = "D:\MDTProduction\Applications\Nutanix_Settings.xml"
 [xml]$MyConfigFile = (Get-Content $MyConfigFileLoc)
 
 $CVM = $MyConfigFile.Settings.Nutanix.CVM
